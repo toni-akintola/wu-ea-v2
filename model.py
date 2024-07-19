@@ -12,7 +12,7 @@ class EpistemicAdvantageModel:
             40  # number of nodes in network, alternates between 3, 6, 12, 18
         )
         # % population marginalized, alternates between 1/6, 1/3, 1/2, 2/3
-        self.proportion_marginalized = 1 / 6
+        self.proportion_marginalized = float(1 / 6)
         self.num_pulls = 1  # number of arm pulls, alternates between 1, 5, 10, 20
         # actual probability of B arm yielding success, alternates between .51, .55, .6, .7, .8
         self.objective_b = 0.51
