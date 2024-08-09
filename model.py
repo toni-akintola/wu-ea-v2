@@ -6,14 +6,23 @@ from modelpy_abm.main import AgentModel
 
 
 def generateInitialData(model: AgentModel):
+    graph = model.get_graph()
+    num_dominants = sum(
+        (
+            1
+            for node, node_data in graph.nodes(data=True)
+            if (node_data.get("type") and node_data["type"] == "dominant")
+        )
+    )
     return {
         "a_success_rate": 0.5,
         "b_success_rate": random.uniform(0.01, 0.99),
         "b_evidence": None,
         "type": (
-            "dominant"
-            if random.random() > model["proportion_marginalized"]
-            else "marginalized"
+            "marginalized"
+            if ((len(graph.nodes) - num_dominants)) / len(graph.nodes)
+            < model["proportion_marginalized"]
+            else "dominant"
         ),
     }
 
@@ -43,20 +52,34 @@ def generateTimestepData(model: AgentModel):
             (1 - model["objective_b"]) ** (model["num_pulls"] - num_evidence)
         )
 
-        # Calculate normalization constant
-        if devalue:
-            # p_IE = (P(H) * P(E | H)) / P(H | e)
-            # Plug in p_IE for prior_belief
-            pE_evidence = 1 - model["degree_devaluation"] * (1 - prior_belief)
-        else:
-            pE_evidence = (pEH_likelihood * prior_belief) + (
-                (1 - model["objective_b"]) ** num_evidence
-            ) * (model["objective_b"] ** (model["num_pulls"] - num_evidence)) * (
-                1 - prior_belief
-            )
+        # Calculate likelihood P(E|H)
+        pEH_likelihood = (model["objective_b"] ** num_evidence) * (
+            (1 - model["objective_b"]) ** (model["num_pulls"] - num_evidence)
+        )
 
-        # Calculate posterior belief using Bayes' theorem
-        posterior = (pEH_likelihood * prior_belief) / pE_evidence
+        # Calculate P(E|¬H)
+        pEnH_likelihood = ((1 - model["objective_b"]) ** num_evidence) * (
+            model["objective_b"] ** (model["num_pulls"] - num_evidence)
+        )
+        if devalue:
+            # Calculate P_f(E) using the devaluation formula
+            pf_E = 1 - model["degree_devaluation"] * (1 - prior_belief)
+        else:
+            pf_E = 1  # Fully trust the evidence
+
+        # Calculate P_f(¬E)
+        pf_notE = 1 - pf_E
+
+        # Calculate posterior using Jeffrey conditionalization
+        posterior = (
+            pEH_likelihood * prior_belief * pf_E
+            + pEnH_likelihood * prior_belief * pf_notE
+        ) / (
+            (pEH_likelihood * prior_belief + pEnH_likelihood * (1 - prior_belief))
+            * pf_E
+            + (pEnH_likelihood * prior_belief + pEH_likelihood * (1 - prior_belief))
+            * pf_notE
+        )
 
         return posterior
 
@@ -106,3 +129,15 @@ def constructModel() -> AgentModel:
     model.set_timestep_function(generateTimestepData)
 
     return model
+
+
+model = constructModel()
+model.initialize_graph()
+
+for _ in range(1):
+    model.timestep()
+
+graph = model.get_graph()
+
+for node, node_data in graph.nodes(data=True):
+    print(node_data)
