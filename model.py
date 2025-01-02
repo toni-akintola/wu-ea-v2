@@ -2,7 +2,7 @@ import statistics
 import networkx as nx
 import numpy as np
 import random
-from modelpy_abm.main import AgentModel
+from emergent.main import AgentModel
 
 
 def generateInitialData(model: AgentModel):
